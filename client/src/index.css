@@ -55,6 +55,10 @@
   --r-sm: 8px;
   --r-lg: 18px;
   --transition: all 0.2s ease;
+  /* Aliases for backwards compatibility */
+  --text-muted: var(--text-3);
+  --text-secondary: var(--text-2);
+  --bg-elevated: var(--bg-3);
 }
 
 body {
