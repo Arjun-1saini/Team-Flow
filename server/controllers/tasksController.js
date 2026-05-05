@@ -30,6 +30,8 @@ export const getTasks = async (req, res, next) => {
       const memberships = await ProjectMember.findAll({ where: { userId: req.user.id }, attributes: ['projectId'] });
       const owned = await Project.findAll({ where: { ownerId: req.user.id }, attributes: ['id'] });
       projectIds = [...new Set([...memberships.map(m => m.projectId), ...owned.map(p => p.id)])];
+      // If user has no projects, return empty immediately
+      if (projectIds.length === 0) return res.json({ success: true, count: 0, tasks: [] });
     }
 
     const where = { projectId: { [Op.in]: projectIds } };

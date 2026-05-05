@@ -272,11 +272,9 @@ export default function ProjectsPage() {
 
   useEffect(() => { fetchProjects(); }, []);
 
-  const handleSave = (saved) => {
-    setProjects(prev => {
-      const exists = prev.find(p => p.id === saved.id);
-      return exists ? prev.map(p => p.id === saved.id ? saved : p) : [saved, ...prev];
-    });
+  const handleSave = () => {
+    // Always re-fetch so taskCounts and members are fresh
+    fetchProjects();
   };
 
   const handleDelete = async (id) => {

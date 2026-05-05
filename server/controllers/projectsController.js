@@ -17,6 +17,14 @@ const getMembership = async (projectId, userId) => {
   return { project, isOwner, membership };
 };
 
+// Helper: attach taskCounts to a project's JSON
+const withTaskCounts = async (project) => {
+  const tasks = await Task.findAll({ where: { projectId: project.id }, attributes: ['status'] });
+  const taskCounts = { todo: 0, 'in-progress': 0, review: 0, done: 0, total: tasks.length };
+  tasks.forEach(t => { taskCounts[t.status] = (taskCounts[t.status] || 0) + 1; });
+  return { ...project.toJSON(), taskCounts };
+};
+
 // GET /api/projects
 export const getProjects = async (req, res, next) => {
   try {
@@ -25,10 +33,13 @@ export const getProjects = async (req, res, next) => {
       await ProjectMember.findAll({ where: { userId: req.user.id }, attributes: ['projectId'] })
     ).map(r => r.projectId);
 
+    // Build the where clause — avoid Op.in with empty array (PostgreSQL rejects it)
+    const where = memberOfIds.length > 0
+      ? { [Op.or]: [{ ownerId: req.user.id }, { id: { [Op.in]: memberOfIds } }] }
+      : { ownerId: req.user.id };
+
     const projects = await Project.findAll({
-      where: {
-        [Op.or]: [{ ownerId: req.user.id }, { id: { [Op.in]: memberOfIds } }],
-      },
+      where,
       include: [
         { model: User, as: 'owner', attributes: USER_ATTRS },
         { model: User, as: 'members', attributes: USER_ATTRS, through: { attributes: ['role'] } },
@@ -36,19 +47,7 @@ export const getProjects = async (req, res, next) => {
       order: [['updatedAt', 'DESC']],
     });
 
-    // Attach task count breakdowns
-    const projectsWithCounts = await Promise.all(
-      projects.map(async (p) => {
-        const tasks = await Task.findAll({
-          where: { projectId: p.id },
-          attributes: ['status'],
-        });
-        const taskCounts = { todo: 0, 'in-progress': 0, review: 0, done: 0, total: tasks.length };
-        tasks.forEach(t => { taskCounts[t.status] = (taskCounts[t.status] || 0) + 1; });
-        return { ...p.toJSON(), taskCounts };
-      })
-    );
-
+    const projectsWithCounts = await Promise.all(projects.map(withTaskCounts));
     res.json({ success: true, count: projects.length, projects: projectsWithCounts });
   } catch (e) { next(e); }
 };
@@ -92,7 +91,8 @@ export const createProject = async (req, res, next) => {
         { model: User, as: 'members', attributes: USER_ATTRS, through: { attributes: ['role'] } },
       ],
     });
-    res.status(201).json({ success: true, project: full });
+    // Return same shape as getProjects (with taskCounts)
+    res.status(201).json({ success: true, project: await withTaskCounts(full) });
   } catch (e) { next(e); }
 };
 
