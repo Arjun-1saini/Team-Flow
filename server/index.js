@@ -19,16 +19,12 @@ const app = express();
 connectDB();
 
 // Middleware
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  process.env.CLIENT_URL,        // set this in Railway to your frontend URL
-].filter(Boolean);
-
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (curl, Postman, Railway healthchecks)
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow: no origin (curl/Postman), any localhost port in dev, or whitelisted prod URL
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost')) return callback(null, true);
+    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true);
     callback(new Error(`CORS blocked: ${origin}`));
   },
   credentials: true,
